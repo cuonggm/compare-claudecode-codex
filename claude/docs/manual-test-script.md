@@ -100,6 +100,10 @@ Open the draft load you created.
 6. Click **Approve** — status becomes `approved`, version v3.
 7. Pick a future date in the schedule input, click **Schedule** — status
    becomes `scheduled` with the chosen timestamp.
+8. Sign in as **Tuan (technician)** or stay as Mira, then click **Start
+   firing** — status becomes `firing` and the firing hero appears.
+9. Click **Complete** — status becomes `completed`; selected pieces move to
+   `fired` in the backlog.
 
 ### Conflict path
 
@@ -111,7 +115,7 @@ Open the draft load you created.
 
 ## 7. Sensor CSV import + alerts
 
-1. Open any draft or scheduled load as Mira or Tuan.
+1. Open any draft, scheduled, or firing load as Mira or Tuan.
 2. Paste this CSV in the import textarea and click Import:
 
    ```csv
@@ -131,10 +135,8 @@ Open the draft load you created.
 
 ### Cool-down detection
 
-For a load that you've manually set to status `firing` in the DB, importing
-a CSV where temperature drops > 180°C/hr should yield an
-`UNEXPECTED_COOLDOWN` alert. The UI does not yet have a Start Firing button
-(see `docs/known-gaps.md`).
+For a load in status `firing`, importing a CSV where temperature drops
+> 180°C/hr should yield an `UNEXPECTED_COOLDOWN` alert.
 
 ## 8. Observer
 
@@ -171,7 +173,7 @@ Use one of the load IDs from `GET /api/loads`.
 - [ ] Member RBAC works front-end and back-end
 - [ ] Planner produces selected + excluded with reason codes
 - [ ] Draft load creation + regenerate
-- [ ] Approve → schedule → cancel state machine
+- [ ] Approve → schedule → start → complete/cancel state machine
 - [ ] Version conflict shows a useful message
 - [ ] CSV import creates readings + alerts
 - [ ] Observer cannot mutate

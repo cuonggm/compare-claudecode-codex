@@ -53,8 +53,15 @@ local-only.
 Permission enforcement lives at the route layer (see `src/auth.ts`). Each route
 calls `requireRole(...)`. The frontend hides actions the user cannot perform
 using the helpers in `@kilnflow/shared`, but **the source of truth is the
-server**: blocked frontend buttons still return 403 from curl. Tests cover both
-the allow and deny paths for representative routes.
+server**: blocked frontend buttons still return 403 from curl. Member writes are
+also constrained so they cannot reassign ownership or set operational piece
+statuses by crafting API requests. Tests cover both the allow and deny paths for
+representative routes.
+
+The Express app also disables `X-Powered-By`, emits basic hardening headers,
+returns JSON for malformed JSON / unknown API routes, and applies a small
+in-memory write-rate limiter. This is still local-tool hardening, not production
+authentication.
 
 ### Planner
 
@@ -103,6 +110,11 @@ compares against the current row version inside a single SQL UPDATE bound by
 `WHERE version = ?`; on mismatch it returns the *current* server state so the
 client can render a useful conflict UI ("v3 on server vs v2 on your screen,
 refresh").
+
+Approval or direct scheduling reserves selected pieces as `in-load`, start moves
+the load into `firing`, complete marks selected pieces as `fired`, and cancel
+releases reserved pieces back to `ready` when the load had entered the
+operational workflow.
 
 ## Frontend
 

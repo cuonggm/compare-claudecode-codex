@@ -301,6 +301,15 @@ export function addLoadNote(db: Db, loadId: number, expectedVersion: number, use
   return getLoad(db, loadId);
 }
 
+const ALLOWED_LOAD_TRANSITIONS: Record<LoadStatus, LoadStatus[]> = {
+  draft: ["approved", "cancelled"],
+  approved: ["scheduled", "cancelled"],
+  scheduled: ["firing", "cancelled"],
+  firing: ["completed", "cancelled"],
+  completed: [],
+  cancelled: []
+};
+
 export function updateLoadStatus(
   db: Db,
   input: { loadId: number; expectedVersion: number; userId: number; status: LoadStatus; scheduledStart?: string | null; scheduledEnd?: string | null }
@@ -308,6 +317,10 @@ export function updateLoadStatus(
   const current = getLoad(db, input.loadId);
   if (current.version !== input.expectedVersion) {
     throw conflict();
+  }
+
+  if (!ALLOWED_LOAD_TRANSITIONS[current.status].includes(input.status)) {
+    throw conflict(`Không thể chuyển mẻ từ trạng thái ${current.status} sang ${input.status}.`);
   }
 
   const timestamp = nowIso();

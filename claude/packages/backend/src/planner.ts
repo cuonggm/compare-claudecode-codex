@@ -10,7 +10,7 @@
 // 4. Report aggregate capacity usage (volume/footprint/weight as percentages)
 //    and warnings.
 //
-// The greedy approach is deliberately simple — it isn't NP-optimal — but it
+// The greedy approach is deliberately simple: it isn't NP-optimal, but it
 // is deterministic, easy to reason about and well-covered by tests.
 
 import type {

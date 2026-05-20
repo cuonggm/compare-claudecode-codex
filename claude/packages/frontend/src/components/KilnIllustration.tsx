@@ -1,11 +1,11 @@
-// Minh hoạ mặt cắt lò nung với ngọn lửa lung linh. Animation chạy bằng CSS.
-// Dùng làm dấu ấn trực quan trên trang Dashboard và Login.
+// Kiln cross-section illustration with CSS-driven flame animation.
+// Used as the main visual signature on Dashboard and Login.
 
 import type { SVGProps } from 'react';
 
 type Props = SVGProps<SVGSVGElement> & {
   size?: number;
-  /** true = ngọn lửa và than hồng nháy động (mặc định) */
+  /** true = animated flame and ember glow; enabled by default */
   active?: boolean;
 };
 

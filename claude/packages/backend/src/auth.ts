@@ -1,7 +1,7 @@
 // Mock auth: clients send X-User-Id header. The user is looked up and
 // attached to req.user. Permission checks happen at the route layer.
 //
-// This is *intentionally* not secure — the requirement is mock auth backed
+// This is *intentionally* not secure: the requirement is mock auth backed
 // by a local user table. Real deployments would replace this with a session.
 
 import type { NextFunction, Request, Response } from 'express';

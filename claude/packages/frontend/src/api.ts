@@ -94,6 +94,10 @@ export const api = {
     request<KilnLoad>('POST', `/loads/${id}/approve`, { expectedVersion }),
   scheduleLoad: (id: string, expectedVersion: number, scheduledAt: string) =>
     request<KilnLoad>('POST', `/loads/${id}/schedule`, { expectedVersion, scheduledAt }),
+  startLoad: (id: string, expectedVersion: number) =>
+    request<KilnLoad>('POST', `/loads/${id}/start`, { expectedVersion }),
+  completeLoad: (id: string, expectedVersion: number) =>
+    request<KilnLoad>('POST', `/loads/${id}/complete`, { expectedVersion }),
   cancelLoad: (id: string, expectedVersion: number) =>
     request<KilnLoad>('POST', `/loads/${id}/cancel`, { expectedVersion }),
   addNote: (id: string, body: string) =>

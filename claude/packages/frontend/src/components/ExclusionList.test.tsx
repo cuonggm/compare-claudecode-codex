@@ -51,12 +51,12 @@ describe('ExclusionList', () => {
     render(<ExclusionList excluded={excluded} piecesById={piecesById} />);
 
     expect(screen.getByText('Tô còn ướt')).toBeInTheDocument();
-    // Reason code tiếng Việt + raw code đính kèm dạng <code>(under-dry)</code>
+    // Vietnamese reason label plus the raw code in a <code>(under-dry)</code> suffix.
     expect(screen.getByText(/chưa đủ khô/)).toBeInTheDocument();
     expect(screen.getByText(/\(under-dry\)/)).toBeInTheDocument();
     expect(screen.getByText(/Độ khô 50%/)).toBeInTheDocument();
     expect(screen.getByText('Cốc bí ẩn')).toBeInTheDocument();
-    // Có 2 chuỗi "men không xác định": label reasonCode + chi tiết message.
+    // There may be two matching strings: the label and the detail message.
     expect(screen.getAllByText(/men không xác định/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/\(unknown-glaze\)/)).toBeInTheDocument();
   });

@@ -106,30 +106,34 @@ export function BacklogPage() {
       })
       .then((data) => {
         if (cancelled) return;
-        let visible = data;
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          visible = visible.filter(
-            (p) =>
-              p.name.toLowerCase().includes(q) ||
-              (ownersById.get(p.ownerId)?.name ?? '').toLowerCase().includes(q),
-          );
-        }
-        if (filters.blockedReason) {
-          if (filters.blockedReason === 'under-dry') {
-            visible = visible.filter((p) => p.drynessPercent < 80);
-          } else if (filters.blockedReason === 'unknown-glaze') {
-            visible = visible.filter((p) => p.glazeFamily === 'unknown');
-          }
-        }
-        setPieces(visible);
+        setPieces(data);
       })
       .catch((e: Error) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [filters, ownersById]);
+  }, [filters.ownerId, filters.cone, filters.firingType, filters.status, filters.dueBefore]);
+
+  const visiblePieces = useMemo(() => {
+    let visible = pieces;
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      visible = visible.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (ownersById.get(p.ownerId)?.name ?? '').toLowerCase().includes(q),
+      );
+    }
+    if (filters.blockedReason) {
+      if (filters.blockedReason === 'under-dry') {
+        visible = visible.filter((p) => p.drynessPercent < 80);
+      } else if (filters.blockedReason === 'unknown-glaze') {
+        visible = visible.filter((p) => p.glazeFamily === 'unknown');
+      }
+    }
+    return visible;
+  }, [filters.blockedReason, filters.search, ownersById, pieces]);
 
   if (!currentUser) return null;
 
@@ -162,7 +166,7 @@ export function BacklogPage() {
         subtitle="Toàn bộ pieces đang chờ, sẵn sàng hoặc đã ra khỏi lò."
         meta={
           <>
-            <span className="badge">{pieces.length} món hiển thị</span>
+            <span className="badge">{visiblePieces.length} món hiển thị</span>
             {activeFilterCount > 0 && (
               <span className="badge severity-info">{activeFilterCount} bộ lọc</span>
             )}
@@ -311,7 +315,7 @@ export function BacklogPage() {
           <div style={{ padding: '1.25rem' }}>
             <Skeleton rows={5} />
           </div>
-        ) : pieces.length === 0 ? (
+        ) : visiblePieces.length === 0 ? (
           <EmptyState
             icon={<Icon.Search size={26} />}
             title="Không có món nào khớp bộ lọc"
@@ -344,7 +348,7 @@ export function BacklogPage() {
                 </tr>
               </thead>
               <tbody>
-                {pieces.map((p) => {
+                {visiblePieces.map((p) => {
                   const canEdit =
                     canEditPiece(currentUser.role) &&
                     (currentUser.role !== 'member' || p.ownerId === currentUser.id);

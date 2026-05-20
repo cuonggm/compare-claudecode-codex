@@ -8,6 +8,7 @@ import type {
   LoadNote,
   Piece,
   SensorReading,
+  User,
 } from '@kilnflow/shared';
 
 import { requireRole, requireUser } from './auth.js';
@@ -36,6 +37,81 @@ function parse<S extends ZodTypeAny>(schema: S, body: unknown, res: Response): z
     return null;
   }
   return result.data as z.infer<S>;
+}
+
+const MEMBER_WRITABLE_STATUSES: Piece['status'][] = ['draft', 'ready', 'blocked'];
+
+function isMemberWritableStatus(status: Piece['status']) {
+  return MEMBER_WRITABLE_STATUSES.includes(status);
+}
+
+function rejectUnsafeMemberPieceWrite(
+  user: User,
+  data: z.infer<typeof pieceInputSchema>,
+  res: Response,
+  existing?: Piece,
+): boolean {
+  if (user.role !== 'member') return false;
+  if (data.ownerId !== user.id) {
+    res.status(403).json({ error: 'Thành viên chỉ được đăng ký món của chính mình.' });
+    return true;
+  }
+  if (existing && !isMemberWritableStatus(existing.status)) {
+    res.status(403).json({ error: 'Thành viên không thể chỉnh sửa món đã vào luồng vận hành.' });
+    return true;
+  }
+  if (!isMemberWritableStatus(data.status as Piece['status'])) {
+    res.status(403).json({ error: 'Thành viên không thể tự đặt trạng thái vận hành cho món.' });
+    return true;
+  }
+  return false;
+}
+
+function resolveCandidatePieces(
+  repo: Repo,
+  candidatePieceIds: string[] | undefined,
+  res: Response,
+): Piece[] | null {
+  if (candidatePieceIds === undefined) return repo.listPieces();
+
+  const pieces: Piece[] = [];
+  const missingPieceIds: string[] = [];
+  for (const id of Array.from(new Set(candidatePieceIds))) {
+    const piece = repo.getPiece(id);
+    if (piece) pieces.push(piece);
+    else missingPieceIds.push(id);
+  }
+
+  if (missingPieceIds.length > 0) {
+    res.status(400).json({
+      error: 'Không tìm thấy một số món trong danh sách ứng viên.',
+      missingPieceIds,
+    });
+    return null;
+  }
+
+  return pieces;
+}
+
+function rejectUnavailableSelectedPieces(repo: Repo, load: KilnLoad, res: Response): boolean {
+  const unavailablePieces = load.plan.selectedPieceIds
+    .map((id) => {
+      const piece = repo.getPiece(id);
+      return {
+        id,
+        name: piece?.name ?? id,
+        status: piece?.status ?? 'missing',
+      };
+    })
+    .filter((p) => p.status !== 'ready');
+
+  if (unavailablePieces.length === 0) return false;
+
+  res.status(409).json({
+    error: 'Một số món trong kế hoạch không còn sẵn sàng. Hãy tạo lại kế hoạch trước khi tiếp tục.',
+    unavailablePieces,
+  });
+  return true;
 }
 
 export function createRoutes(repo: Repo): Router {
@@ -80,15 +156,11 @@ export function createRoutes(repo: Repo): Router {
     const data = parse(pieceInputSchema, req.body, res);
     if (!data) return;
     const user = req.user!;
-    // Members can only create pieces for themselves.
-    if (user.role === 'member' && data.ownerId !== user.id) {
-      res.status(403).json({ error: 'Thành viên chỉ được đăng ký món của chính mình.' });
-      return;
-    }
     if (user.role === 'observer') {
       res.status(403).json({ error: 'Người xem không thể tạo món.' });
       return;
     }
+    if (rejectUnsafeMemberPieceWrite(user, data, res)) return;
     if (!repo.getUser(data.ownerId)) {
       res.status(400).json({ error: 'Không tìm thấy chủ sở hữu.' });
       return;
@@ -134,6 +206,11 @@ export function createRoutes(repo: Repo): Router {
     }
     const data = parse(pieceInputSchema, req.body, res);
     if (!data) return;
+    if (rejectUnsafeMemberPieceWrite(user, data, res, existing)) return;
+    if (!repo.getUser(data.ownerId)) {
+      res.status(400).json({ error: 'Không tìm thấy chủ sở hữu.' });
+      return;
+    }
     const updated: Piece = {
       ...existing,
       ownerId: data.ownerId,
@@ -197,11 +274,8 @@ export function createRoutes(repo: Repo): Router {
       res.status(404).json({ error: 'Không tìm thấy lò nung.' });
       return;
     }
-    const candidates = data.candidatePieceIds && data.candidatePieceIds.length > 0
-      ? (data.candidatePieceIds
-          .map((id) => repo.getPiece(id))
-          .filter((p): p is Piece => Boolean(p)))
-      : repo.listPieces();
+    const candidates = resolveCandidatePieces(repo, data.candidatePieceIds, res);
+    if (!candidates) return;
     const plan = planLoad({
       kiln,
       targetCone: data.targetCone as Piece['targetCone'],
@@ -220,11 +294,8 @@ export function createRoutes(repo: Repo): Router {
       res.status(404).json({ error: 'Không tìm thấy lò nung.' });
       return;
     }
-    const candidates = data.candidatePieceIds && data.candidatePieceIds.length > 0
-      ? (data.candidatePieceIds
-          .map((id) => repo.getPiece(id))
-          .filter((p): p is Piece => Boolean(p)))
-      : repo.listPieces();
+    const candidates = resolveCandidatePieces(repo, data.candidatePieceIds, res);
+    if (!candidates) return;
     const plan = planLoad({
       kiln,
       targetCone: data.targetCone as Piece['targetCone'],
@@ -300,14 +371,17 @@ export function createRoutes(repo: Repo): Router {
     }
     const data = parse(loadActionSchema, req.body, res);
     if (!data) return;
+    if (rejectUnavailableSelectedPieces(repo, load, res)) return;
+    const now = new Date().toISOString();
     const updated = repo.updateLoadWithVersionCheck(load.id, data.expectedVersion, {
       status: 'approved',
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     });
     if ('conflict' in updated) {
       res.status(409).json({ error: 'Phiên bản đã cũ.', current: updated.current });
       return;
     }
+    repo.updatePieceStatuses(load.plan.selectedPieceIds, 'in-load', now);
     res.json(updated);
   });
 
@@ -323,15 +397,69 @@ export function createRoutes(repo: Repo): Router {
     }
     const data = parse(scheduleSchema, req.body, res);
     if (!data) return;
+    if (load.status === 'draft' && rejectUnavailableSelectedPieces(repo, load, res)) return;
+    const now = new Date().toISOString();
     const updated = repo.updateLoadWithVersionCheck(load.id, data.expectedVersion, {
       status: 'scheduled',
       scheduledAt: new Date(data.scheduledAt).toISOString(),
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     });
     if ('conflict' in updated) {
       res.status(409).json({ error: 'Phiên bản đã cũ.', current: updated.current });
       return;
     }
+    repo.updatePieceStatuses(load.plan.selectedPieceIds, 'in-load', now);
+    res.json(updated);
+  });
+
+  r.post('/loads/:id/start', requireRole('technician', 'manager'), (req, res) => {
+    const load = repo.getLoad(req.params.id);
+    if (!load) {
+      res.status(404).json({ error: 'Không tìm thấy đợt nung.' });
+      return;
+    }
+    if (!(load.status === 'approved' || load.status === 'scheduled')) {
+      res.status(409).json({ error: `Đợt nung đang ở trạng thái ${load.status}, không thể bắt đầu nung.` });
+      return;
+    }
+    const data = parse(loadActionSchema, req.body, res);
+    if (!data) return;
+    const now = new Date().toISOString();
+    const updated = repo.updateLoadWithVersionCheck(load.id, data.expectedVersion, {
+      status: 'firing',
+      scheduledAt: load.scheduledAt ?? now,
+      updatedAt: now,
+    });
+    if ('conflict' in updated) {
+      res.status(409).json({ error: 'Phiên bản đã cũ.', current: updated.current });
+      return;
+    }
+    repo.updatePieceStatuses(load.plan.selectedPieceIds, 'in-load', now);
+    res.json(updated);
+  });
+
+  r.post('/loads/:id/complete', requireRole('technician', 'manager'), (req, res) => {
+    const load = repo.getLoad(req.params.id);
+    if (!load) {
+      res.status(404).json({ error: 'Không tìm thấy đợt nung.' });
+      return;
+    }
+    if (load.status !== 'firing') {
+      res.status(409).json({ error: `Đợt nung đang ở trạng thái ${load.status}, không thể hoàn tất.` });
+      return;
+    }
+    const data = parse(loadActionSchema, req.body, res);
+    if (!data) return;
+    const now = new Date().toISOString();
+    const updated = repo.updateLoadWithVersionCheck(load.id, data.expectedVersion, {
+      status: 'completed',
+      updatedAt: now,
+    });
+    if ('conflict' in updated) {
+      res.status(409).json({ error: 'Phiên bản đã cũ.', current: updated.current });
+      return;
+    }
+    repo.updatePieceStatuses(load.plan.selectedPieceIds, 'fired', now);
     res.json(updated);
   });
 
@@ -347,13 +475,17 @@ export function createRoutes(repo: Repo): Router {
     }
     const data = parse(loadActionSchema, req.body, res);
     if (!data) return;
+    const now = new Date().toISOString();
     const updated = repo.updateLoadWithVersionCheck(load.id, data.expectedVersion, {
       status: 'cancelled',
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     });
     if ('conflict' in updated) {
       res.status(409).json({ error: 'Phiên bản đã cũ.', current: updated.current });
       return;
+    }
+    if (load.status !== 'draft') {
+      repo.updatePieceStatuses(load.plan.selectedPieceIds, 'ready', now);
     }
     res.json(updated);
   });
@@ -431,9 +563,10 @@ export function createRoutes(repo: Repo): Router {
     }));
     repo.insertSensorReadings(newReadings);
 
+    const newReadingIds = new Set(newReadings.map((n) => n.id));
     const existing = repo
       .listSensorReadings(load.id)
-      .filter((r) => !newReadings.find((n) => n.id === r.id));
+      .filter((r) => !newReadingIds.has(r.id));
     const analyzed = analyzeReadings({
       existingReadings: existing,
       newReadings,
@@ -509,7 +642,7 @@ function aggregateBlockedReasons(pieces: Piece[]) {
   for (const p of pieces) {
     if (p.status !== 'blocked') continue;
     // Surface a friendly reason: unknown glaze / under-dry / wrong cone aren't
-    // stored in piece state directly — we approximate by inspecting attributes.
+    // stored in piece state directly; we approximate by inspecting attributes.
     if (p.glazeFamily === 'unknown') {
       counts.set('unknown-glaze', (counts.get('unknown-glaze') ?? 0) + 1);
     } else if (p.drynessPercent < 80) {

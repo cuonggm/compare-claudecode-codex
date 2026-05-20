@@ -1,5 +1,5 @@
-// Biểu đồ đường SVG cho dữ liệu cảm biến. Tự render gridlines, axis labels,
-// area fill và callout cho điểm đo cuối. Tránh dependency để giữ bundle gọn.
+// SVG line chart for sensor readings. Renders gridlines, axis labels, area
+// fill, and the latest-point callout without adding a chart dependency.
 
 import type { SensorReading } from '@kilnflow/shared';
 

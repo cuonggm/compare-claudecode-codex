@@ -12,11 +12,12 @@ export function currentUser(req: Request): User {
   return (req as Request & { user: User }).user;
 }
 
+const USER_ID_PATTERN = /^[1-9][0-9]{0,9}$/;
+
 export function attachUser(db: Db) {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    const headerValue = req.header("x-user-id");
-    const userId = headerValue ? Number(headerValue) : NaN;
-    const user = Number.isInteger(userId) ? getUser(db, userId) : getGuestUser(db);
+    const headerValue = req.header("x-user-id")?.trim() ?? "";
+    const user = USER_ID_PATTERN.test(headerValue) ? getUser(db, Number(headerValue)) : null;
     (req as AuthedRequest).user = user ?? getGuestUser(db);
     next();
   };

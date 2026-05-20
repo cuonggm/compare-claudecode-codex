@@ -1,6 +1,6 @@
-import { AlertTriangle, ArrowRight, BellRing, Boxes, CalendarClock, CheckCircle2, ChevronRight, ClipboardList, Flame, Gauge, LayoutDashboard, ListFilter, LockKeyhole, Plus, RefreshCw, Route, ShieldCheck, Upload, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowRight, BellRing, Boxes, CalendarClock, CheckCircle2, ChevronRight, ClipboardList, Flame, Gauge, LayoutDashboard, ListFilter, LockKeyhole, Plus, RefreshCw, Route, ShieldCheck, Upload, UserRound, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPieceBlockReasons, type Alert, type FiringType, type Kiln, type Load, type Piece, type TargetCone, type User } from "../shared/domain";
 import type { PlannerResult } from "../shared/planner";
 import { Api, type ApiError, type DashboardSummary, type LoadDetail, canManageLoads, canManageSchedule } from "./lib/api";
@@ -19,6 +19,13 @@ type ViewGuide = {
   summary: string;
   primaryAction: string;
   nextAction: string;
+};
+
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  onConfirm: () => void | Promise<void>;
 };
 
 const coneOptions: TargetCone[] = ["04", "6", "10"];
@@ -46,8 +53,17 @@ export function App() {
   const [planResult, setPlanResult] = useState<PlannerResult | null>(null);
   const [notice, setNotice] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [pending, setPending] = useState(0);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0];
+  const isBusy = pending > 0;
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 6000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const handleError = useCallback((err: unknown) => {
     const apiError = err as ApiError;
@@ -58,6 +74,16 @@ export function App() {
     setError(localizeApiError(apiError));
   }, []);
 
+  const track = useCallback(<T,>(promise: Promise<T>): Promise<T> => {
+    setPending((value) => value + 1);
+    return promise.finally(() => setPending((value) => Math.max(0, value - 1)));
+  }, []);
+
+  const selectedLoadIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    selectedLoadIdRef.current = selectedLoadId;
+  }, [selectedLoadId]);
+
   const refreshCore = useCallback(async (userId = currentUserId) => {
     const [dashboardResponse, kilnsResponse, loadsResponse] = await Promise.all([
       Api.dashboard(userId),
@@ -67,10 +93,14 @@ export function App() {
     setDashboard(dashboardResponse);
     setKilns(kilnsResponse.kilns);
     setLoads(loadsResponse.loads);
-    if (!selectedLoadId && loadsResponse.loads.length > 0) {
-      setSelectedLoadId(loadsResponse.loads[0].id);
+
+    const currentSelectedId = selectedLoadIdRef.current;
+    const stillExists = currentSelectedId !== null && loadsResponse.loads.some((load) => load.id === currentSelectedId);
+    if (!stillExists) {
+      setSelectedLoadId(loadsResponse.loads[0]?.id ?? null);
+      setLoadDetail(null);
     }
-  }, [currentUserId, selectedLoadId]);
+  }, [currentUserId]);
 
   const refreshPieces = useCallback(async (filters: Record<string, string> = {}, userId = currentUserId) => {
     if (!currentUser || currentUser.role === "observer") {
@@ -88,14 +118,21 @@ export function App() {
   }, [currentUserId, selectedLoadId]);
 
   useEffect(() => {
-    Api.users(currentUserId)
+    let cancelled = false;
+    Api.users(1)
       .then((response) => {
+        if (cancelled) return;
         setUsers(response.users);
         const manager = response.users.find((user) => user.role === "manager");
         if (manager) setCurrentUserId(manager.id);
       })
-      .catch(handleError);
-  }, []);
+      .catch((err) => {
+        if (!cancelled) handleError(err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [handleError]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -129,6 +166,7 @@ export function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Bỏ qua đến nội dung chính</a>
       <aside className="sidebar" aria-label="Điều hướng chính">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true"><Flame size={23} /></span>
@@ -171,15 +209,18 @@ export function App() {
         </div>
       </aside>
 
-      <main className="main-panel">
+      <main className="main-panel" id="main-content" aria-busy={isBusy ? true : undefined}>
         <header className="topbar">
           <div>
             <h1>{viewTitle(view)}</h1>
-            <p>{currentUser ? `${currentUser.name} - ${formatRole(currentUser.role)}` : "Đang tải hồ sơ vận hành"}</p>
+            <p>
+              {currentUser ? `${currentUser.name} - ${formatRole(currentUser.role)}` : "Đang tải hồ sơ vận hành"}
+              {isBusy ? <span className="busy-indicator" aria-live="polite"> · đang xử lý...</span> : null}
+            </p>
           </div>
           <label className="login-control">
             Đăng nhập giả lập
-            <select value={currentUserId} onChange={(event) => setCurrentUserId(Number(event.target.value))}>
+            <select value={currentUserId} onChange={(event) => setCurrentUserId(Number(event.target.value))} disabled={isBusy}>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>{user.name} - {formatRole(user.role)}</option>
               ))}
@@ -189,8 +230,12 @@ export function App() {
 
         <RoleContextPanel user={currentUser} view={view} onNavigate={setView} />
 
-        {notice ? <div className="notice success" role="status">{notice}</div> : null}
-        {error ? <div className="notice error" role="alert">{error}</div> : null}
+        {notice ? (
+          <DismissibleNotice tone="success" onDismiss={() => setNotice("")} message={notice} />
+        ) : null}
+        {error ? (
+          <DismissibleNotice tone="error" onDismiss={() => setError("")} message={error} />
+        ) : null}
 
         {view === "dashboard" && dashboard ? (
           <Dashboard dashboard={dashboard} onOpenLoads={() => setView("loads")} />
@@ -201,14 +246,17 @@ export function App() {
             users={users}
             user={currentUser}
             pieces={pieces}
-            onRefresh={(filters) => refreshPieces(filters).catch(handleError)}
-            onCreate={async (input) => {
-              setError("");
-              const response = await Api.createPiece(currentUser.id, input);
-              setNotice(`Đã tạo món: ${response.piece.name}`);
-              await refreshPieces();
-              await refreshCore();
-            }}
+            isBusy={isBusy}
+            onRefresh={(filters) => track(refreshPieces(filters)).catch(handleError)}
+            onCreate={(input) =>
+              track((async () => {
+                setError("");
+                const response = await Api.createPiece(currentUser.id, input);
+                setNotice(`Đã tạo món: ${response.piece.name}`);
+                await refreshPieces();
+                await refreshCore();
+              })())
+            }
             onError={handleError}
           />
         ) : null}
@@ -218,15 +266,18 @@ export function App() {
             user={currentUser}
             kilns={kilns}
             planResult={planResult}
-            onPlan={async (input) => {
-              setError("");
-              const response = await Api.planLoad(currentUser.id, input);
-              setPlanResult(response.plan);
-              setLoadDetail(response.detail);
-              setSelectedLoadId(response.load.id);
-              setNotice(`Đã tạo mẻ nung nháp ${response.load.id} với ${response.plan.selectedPieces.length} món được chọn.`);
-              await refreshCore();
-            }}
+            isBusy={isBusy}
+            onPlan={(input) =>
+              track((async () => {
+                setError("");
+                const response = await Api.planLoad(currentUser.id, input);
+                setPlanResult(response.plan);
+                setLoadDetail(response.detail);
+                setSelectedLoadId(response.load.id);
+                setNotice(`Đã tạo mẻ nung nháp ${response.load.id} với ${response.plan.selectedPieces.length} món được chọn.`);
+                await refreshCore();
+              })())
+            }
             onError={handleError}
           />
         ) : null}
@@ -237,19 +288,33 @@ export function App() {
             loads={loads}
             detail={loadDetail}
             selectedLoadId={selectedLoadId}
+            isBusy={isBusy}
             onSelectLoad={setSelectedLoadId}
             onRefresh={() => {
               setError("");
-              refreshCore().then(() => refreshLoadDetail()).catch(handleError);
+              track(refreshCore().then(() => refreshLoadDetail())).catch(handleError);
             }}
             onDetailChange={(detail) => {
               setLoadDetail(detail);
-              refreshCore().catch(handleError);
+              track(refreshCore()).catch(handleError);
             }}
             onError={handleError}
+            onConfirm={(request) => setConfirm(request)}
+            trackAsync={track}
           />
         ) : null}
       </main>
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        request={confirm}
+        onCancel={() => setConfirm(null)}
+        onConfirm={async () => {
+          const current = confirm;
+          setConfirm(null);
+          if (current) await current.onConfirm();
+        }}
+      />
     </div>
   );
 }
@@ -466,6 +531,7 @@ function Backlog({
   users,
   user,
   pieces,
+  isBusy,
   onRefresh,
   onCreate,
   onError
@@ -473,6 +539,7 @@ function Backlog({
   users: User[];
   user: User;
   pieces: Piece[];
+  isBusy: boolean;
   onRefresh: (filters: Record<string, string>) => void;
   onCreate: (input: Parameters<typeof Api.createPiece>[1]) => Promise<void>;
   onError: (error: unknown) => void;
@@ -637,7 +704,7 @@ function Backlog({
         <label>Ghi chú
           <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         </label>
-        <button type="submit" className="primary-button"><Plus size={18} />Tạo phiếu nhận</button>
+        <button type="submit" className="primary-button" disabled={isBusy}><Plus size={18} />Tạo phiếu nhận</button>
       </form>
     </section>
   );
@@ -647,12 +714,14 @@ function Planner({
   user,
   kilns,
   planResult,
+  isBusy,
   onPlan,
   onError
 }: {
   user: User;
   kilns: Kiln[];
   planResult: PlannerResult | null;
+  isBusy: boolean;
   onPlan: (input: { kilnId: number; targetCone: TargetCone; firingType: FiringType; dueDatePriority: boolean }) => Promise<void>;
   onError: (error: unknown) => void;
 }) {
@@ -700,7 +769,7 @@ function Planner({
             {firingOptions.map((type) => <option key={type} value={type}>{formatFiringType(type)}</option>)}
           </select>
         </label>
-        <button type="submit" className="primary-button" disabled={!canManageLoads(user.role)}>
+        <button type="submit" className="primary-button" disabled={!canManageLoads(user.role) || isBusy}>
           <Gauge size={18} />Chạy lập mẻ
         </button>
       </form>
@@ -732,19 +801,25 @@ function LoadsView({
   loads,
   detail,
   selectedLoadId,
+  isBusy,
   onSelectLoad,
   onRefresh,
   onDetailChange,
-  onError
+  onError,
+  onConfirm,
+  trackAsync
 }: {
   user: User;
   loads: Load[];
   detail: LoadDetail | null;
   selectedLoadId: number | null;
+  isBusy: boolean;
   onSelectLoad: (loadId: number) => void;
   onRefresh: () => void;
   onDetailChange: (detail: LoadDetail) => void;
   onError: (error: unknown) => void;
+  onConfirm: (request: ConfirmRequest) => void;
+  trackAsync: <T,>(promise: Promise<T>) => Promise<T>;
 }) {
   return (
     <section className="loads-layout">
@@ -775,9 +850,12 @@ function LoadsView({
         <LoadDetailPanel
           user={user}
           detail={detail}
+          isBusy={isBusy}
           onDetailChange={onDetailChange}
           onError={onError}
           onRefresh={onRefresh}
+          onConfirm={onConfirm}
+          trackAsync={trackAsync}
         />
       ) : (
         <div className="panel"><p className="muted">Chọn một mẻ nung để xem lịch nung, ghi chú nhật ký và cảnh báo cảm biến.</p></div>
@@ -789,26 +867,38 @@ function LoadsView({
 function LoadDetailPanel({
   user,
   detail,
+  isBusy,
   onDetailChange,
   onError,
-  onRefresh
+  onRefresh,
+  onConfirm,
+  trackAsync
 }: {
   user: User;
   detail: LoadDetail;
+  isBusy: boolean;
   onDetailChange: (detail: LoadDetail) => void;
   onError: (error: unknown) => void;
   onRefresh: () => void;
+  onConfirm: (request: ConfirmRequest) => void;
+  trackAsync: <T,>(promise: Promise<T>) => Promise<T>;
 }) {
   const [note, setNote] = useState("");
   const [csv, setCsv] = useState(sampleCsv);
-  const [scheduledStart, setScheduledStart] = useState("2026-05-22T09:00");
-  const [scheduledEnd, setScheduledEnd] = useState("2026-05-22T17:00");
+  const defaultStart = useMemo(() => formatLocalDateTime(addDays(new Date(), 1, 9)), []);
+  const defaultEnd = useMemo(() => formatLocalDateTime(addDays(new Date(), 1, 17)), []);
+  const [scheduledStart, setScheduledStart] = useState(defaultStart);
+  const [scheduledEnd, setScheduledEnd] = useState(defaultEnd);
   const manager = canManageSchedule(user.role);
   const technician = canManageLoads(user.role);
+  const canRegenerate = technician && detail.load.status === "draft";
+  const canApprove = manager && detail.load.status === "draft";
+  const canSchedule = manager && detail.load.status === "approved";
+  const canCancel = manager && detail.load.status !== "cancelled" && detail.load.status !== "completed";
 
   async function runAction(action: () => Promise<{ detail: LoadDetail }>) {
     try {
-      const response = await action();
+      const response = await trackAsync(action());
       onDetailChange(response.detail);
     } catch (error) {
       onError(error);
@@ -832,24 +922,43 @@ function LoadDetailPanel({
       </div>
 
       <div className="detail-actions" aria-label="Thao tác mẻ nung">
-        <button type="button" disabled={!technician || detail.load.status !== "draft"} onClick={() => {
-          Api.regenerate(user.id, detail.load.id, detail.load.version)
+        <button type="button" disabled={!canRegenerate || isBusy} onClick={() => {
+          trackAsync(Api.regenerate(user.id, detail.load.id, detail.load.version))
             .then((response) => onDetailChange(response.detail))
             .catch(onError);
         }}>
           <RefreshCw size={16} />Tạo lại nháp
         </button>
-        <button type="button" disabled={!manager} onClick={() => runAction(() => Api.approve(user.id, detail.load.id, detail.load.version))}>
+        <button type="button" disabled={!canApprove || isBusy} onClick={() => runAction(() => Api.approve(user.id, detail.load.id, detail.load.version))}>
           <ShieldCheck size={16} />Duyệt
         </button>
-        <button type="button" disabled={!manager} onClick={() => runAction(() => Api.schedule(user.id, detail.load.id, {
-          expectedVersion: detail.load.version,
-          scheduledStart: new Date(scheduledStart).toISOString(),
-          scheduledEnd: new Date(scheduledEnd).toISOString()
-        }))}>
+        <button type="button" disabled={!canSchedule || isBusy} onClick={() => {
+          const start = new Date(scheduledStart);
+          const end = new Date(scheduledEnd);
+          if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+            onError(new Error("Thời gian lịch nung không hợp lệ."));
+            return;
+          }
+          if (end <= start) {
+            onError(new Error("Thời điểm kết thúc phải sau thời điểm bắt đầu."));
+            return;
+          }
+          runAction(() => Api.schedule(user.id, detail.load.id, {
+            expectedVersion: detail.load.version,
+            scheduledStart: start.toISOString(),
+            scheduledEnd: end.toISOString()
+          }));
+        }}>
           <CalendarClock size={16} />Lên lịch
         </button>
-        <button type="button" disabled={!manager} onClick={() => runAction(() => Api.cancel(user.id, detail.load.id, detail.load.version))}>
+        <button type="button" className="danger-button" disabled={!canCancel || isBusy} onClick={() => {
+          onConfirm({
+            title: `Hủy mẻ ${detail.load.id}?`,
+            message: "Hành động hủy mẻ nung sẽ chốt trạng thái và không thể quay lại. Vẫn tiếp tục?",
+            confirmLabel: "Hủy mẻ nung",
+            onConfirm: () => runAction(() => Api.cancel(user.id, detail.load.id, detail.load.version))
+          });
+        }}>
           <AlertTriangle size={16} />Hủy
         </button>
       </div>
@@ -900,9 +1009,11 @@ function LoadDetailPanel({
         <label>CSV cảm biến
           <textarea className="csv-box" value={csv} onChange={(event) => setCsv(event.target.value)} />
         </label>
-        <button type="button" className="primary-button" disabled={!technician} onClick={() => {
-          Api.importCsv(user.id, detail.load.id, csv)
-            .then(() => Api.loadDetail(user.id, detail.load.id))
+        <button type="button" className="primary-button" disabled={!technician || isBusy} onClick={() => {
+          trackAsync(
+            Api.importCsv(user.id, detail.load.id, csv)
+              .then(() => Api.loadDetail(user.id, detail.load.id))
+          )
             .then(onDetailChange)
             .catch(onError);
         }}>
@@ -916,8 +1027,9 @@ function LoadDetailPanel({
         <h3>Nhật ký quyết định</h3>
         <form className="note-form" onSubmit={(event) => {
           event.preventDefault();
-          if (!note.trim()) return;
-          Api.addNote(user.id, detail.load.id, detail.load.version, note)
+          const trimmed = note.trim();
+          if (!trimmed) return;
+          trackAsync(Api.addNote(user.id, detail.load.id, detail.load.version, trimmed))
             .then((response) => {
               setNote("");
               onDetailChange(response.detail);
@@ -925,8 +1037,15 @@ function LoadDetailPanel({
             .catch(onError);
         }}>
           <label className="sr-only" htmlFor="technical-note">Ghi chú kỹ thuật</label>
-          <input id="technical-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Thêm ghi chú kỹ thuật" disabled={!technician} />
-          <button type="submit" disabled={!technician}>Thêm ghi chú</button>
+          <input
+            id="technical-note"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="Thêm ghi chú kỹ thuật"
+            disabled={!technician || isBusy}
+            maxLength={1000}
+          />
+          <button type="submit" disabled={!technician || isBusy || !note.trim()}>Thêm ghi chú</button>
         </form>
         <ul className="audit-list">
           {detail.auditNotes.map((item) => <li key={item.id}><strong>{item.userName}</strong><span>{item.note}</span><small>{formatDateTime(item.createdAt)}</small></li>)}
@@ -1082,6 +1201,55 @@ function RecentAlerts({ alerts }: { alerts: Alert[] }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+function DismissibleNotice({ message, tone, onDismiss }: { message: string; tone: "success" | "error"; onDismiss: () => void }) {
+  return (
+    <div className={`notice ${tone}`} role={tone === "error" ? "alert" : "status"}>
+      <span className="notice-body">{message}</span>
+      <button type="button" className="notice-dismiss" aria-label="Đóng thông báo" onClick={onDismiss}>
+        <X size={16} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  open,
+  request,
+  onCancel,
+  onConfirm
+}: {
+  open: boolean;
+  request: ConfirmRequest | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onCancel();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [open, onCancel]);
+
+  if (!open || !request) return null;
+
+  return (
+    <div className="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+      <div className="dialog">
+        <h2 id="confirm-dialog-title">{request.title}</h2>
+        <p>{request.message}</p>
+        <div className="dialog-actions">
+          <button type="button" onClick={onCancel}>Không, để sau</button>
+          <button type="button" className="primary-button danger" onClick={onConfirm} autoFocus>
+            {request.confirmLabel ?? "Xác nhận"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1245,6 +1413,18 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function addDays(base: Date, days: number, hours: number): Date {
+  const next = new Date(base);
+  next.setDate(next.getDate() + days);
+  next.setHours(hours, 0, 0, 0);
+  return next;
+}
+
+function formatLocalDateTime(date: Date): string {
+  const pad = (value: number) => value.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function localizeApiError(apiError: ApiError): string {

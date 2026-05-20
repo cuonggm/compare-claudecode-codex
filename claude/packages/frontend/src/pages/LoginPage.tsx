@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../state/auth';
 import { roleLabel } from '../i18n';
 import { Icon } from '../components/Icon';
@@ -7,6 +7,12 @@ import { KilnIllustration } from '../components/KilnIllustration';
 export function LoginPage() {
   const { users, setUser } = useAuth();
   const [selectedId, setSelectedId] = useState<string>(users[0]?.id ?? '');
+
+  useEffect(() => {
+    if (!selectedId && users[0]) {
+      setSelectedId(users[0].id);
+    }
+  }, [selectedId, users]);
 
   function initials(name: string) {
     return name

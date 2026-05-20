@@ -1,6 +1,6 @@
-// Bảng dịch tiếng Việt cho các giá trị enum hiển thị trên UI.
-// Code identifier (status string, reason code, alert code) giữ nguyên ở
-// backend / API; layer này chỉ format khi render.
+// Vietnamese UI labels for enum values.
+// Code identifiers (status strings, reason codes, alert codes) stay unchanged
+// in the backend/API; this layer only formats them for rendering.
 
 import type {
   AlertSeverity,
@@ -45,8 +45,8 @@ export const alertSeverityLabel: Record<AlertSeverity, string> = {
   critical: 'nghiêm trọng',
 };
 
-// Thuật ngữ gốm chuyên ngành (stoneware, porcelain…) thường giữ tiếng Anh
-// trong giới gốm Việt Nam. Chỉ thêm chú giải khi cần.
+// Ceramic terms are commonly kept in English in Vietnamese studios. Add
+// clarifying text only when it reduces ambiguity.
 export const clayBodyLabel: Record<ClayBody, string> = {
   stoneware: 'stoneware',
   porcelain: 'porcelain',
@@ -89,7 +89,7 @@ export const reasonCodeLabel: Record<ExclusionReasonCode, string> = {
   'cone10-earthenware-blocked': 'earthenware bị chặn ở cone 10',
 };
 
-// Dịch các block-reason hiển thị trên bộ lọc Hàng đợi.
+// Labels for blocked-reason summaries displayed on the backlog filters.
 export const blockReasonLabel: Record<string, string> = {
   'under-dry': 'chưa đủ khô',
   'unknown-glaze': 'men không xác định',

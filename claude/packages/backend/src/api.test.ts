@@ -21,6 +21,22 @@ describe('API integration', () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['x-frame-options']).toBe('DENY');
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('returns JSON for malformed JSON and unknown API routes', async () => {
+    const badJson = await request(app)
+      .post('/api/pieces')
+      .set('Content-Type', 'application/json')
+      .send('{"name":');
+    expect(badJson.status).toBe(400);
+    expect(badJson.body.error).toMatch(/JSON/);
+
+    const missing = await request(app).get('/api/does-not-exist');
+    expect(missing.status).toBe(404);
+    expect(missing.body.error).toMatch(/Không tìm thấy endpoint/);
   });
 
   it('lists users without auth', async () => {
@@ -192,6 +208,50 @@ describe('API integration', () => {
     expect(res.body.ownerId).toBe('user-an');
   });
 
+  it('member cannot forge owner or operational status through piece APIs', async () => {
+    const createAsFired = await request(app)
+      .post('/api/pieces')
+      .set('X-User-Id', 'user-an')
+      .send({
+        ownerId: 'user-an',
+        name: 'already fired',
+        clayBody: 'stoneware',
+        glazeFamily: 'clear',
+        targetCone: '6',
+        firingType: 'oxidation',
+        widthCm: 10,
+        depthCm: 10,
+        heightCm: 10,
+        weightKg: 1,
+        drynessPercent: 90,
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+        notes: '',
+        status: 'fired',
+      });
+    expect(createAsFired.status).toBe(403);
+
+    const reassign = await request(app)
+      .put('/api/pieces/piece-an-bowl-1')
+      .set('X-User-Id', 'user-an')
+      .send({
+        ownerId: 'user-linh',
+        name: 'forged edit',
+        clayBody: 'stoneware',
+        glazeFamily: 'clear',
+        targetCone: '6',
+        firingType: 'oxidation',
+        widthCm: 10,
+        depthCm: 10,
+        heightCm: 10,
+        weightKg: 1,
+        drynessPercent: 90,
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+        notes: '',
+        status: 'ready',
+      });
+    expect(reassign.status).toBe(403);
+  });
+
   it('rejects piece with invalid dimensions (zod)', async () => {
     const res = await request(app)
       .post('/api/pieces')
@@ -212,6 +272,20 @@ describe('API integration', () => {
         notes: '',
       });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects unknown candidate piece ids instead of silently ignoring them', async () => {
+    const res = await request(app)
+      .post('/api/loads/plan')
+      .set('X-User-Id', 'user-tuan')
+      .send({
+        kilnId: 'kiln-skutt-1027',
+        targetCone: '6',
+        firingType: 'oxidation',
+        candidatePieceIds: ['piece-an-bowl-1', 'missing-piece'],
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.missingPieceIds).toEqual(['missing-piece']);
   });
 
   it('dashboard returns summary', async () => {
@@ -237,5 +311,41 @@ describe('API integration', () => {
       .send({ expectedVersion: approved.body.version, scheduledAt: new Date(Date.now() + 86400000).toISOString() });
     expect(scheduled.status).toBe(200);
     expect(scheduled.body.status).toBe('scheduled');
+  });
+
+  it('load lifecycle reserves selected pieces, starts firing, and marks pieces fired on completion', async () => {
+    const created = await request(app)
+      .post('/api/loads')
+      .set('X-User-Id', 'user-tuan')
+      .send({ kilnId: 'kiln-skutt-1027', targetCone: '6', firingType: 'oxidation' });
+    const id = created.body.id;
+    const selectedPieceId = created.body.plan.selectedPieceIds[0];
+
+    const approved = await request(app)
+      .post(`/api/loads/${id}/approve`)
+      .set('X-User-Id', 'user-mira')
+      .send({ expectedVersion: created.body.version });
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe('approved');
+
+    const reservedPiece = await request(app).get(`/api/pieces/${selectedPieceId}`);
+    expect(reservedPiece.body.status).toBe('in-load');
+
+    const started = await request(app)
+      .post(`/api/loads/${id}/start`)
+      .set('X-User-Id', 'user-tuan')
+      .send({ expectedVersion: approved.body.version });
+    expect(started.status).toBe(200);
+    expect(started.body.status).toBe('firing');
+
+    const completed = await request(app)
+      .post(`/api/loads/${id}/complete`)
+      .set('X-User-Id', 'user-tuan')
+      .send({ expectedVersion: started.body.version });
+    expect(completed.status).toBe(200);
+    expect(completed.body.status).toBe('completed');
+
+    const firedPiece = await request(app).get(`/api/pieces/${selectedPieceId}`);
+    expect(firedPiece.body.status).toBe('fired');
   });
 });

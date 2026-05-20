@@ -7,8 +7,8 @@ import { Icon } from './Icon';
 
 const STORAGE_KEY = 'kilnflow.guideCollapsed';
 
-// "Bạn nên làm gì tiếp theo" — bảng hướng dẫn workflow theo role hiện tại.
-// Có thể thu gọn (lưu localStorage) để không cản trở user đã quen việc.
+// "What should I do next" workflow guide for the current role. It can be
+// collapsed and persisted so it does not block experienced users.
 export function WorkflowGuide({
   role,
   userName,

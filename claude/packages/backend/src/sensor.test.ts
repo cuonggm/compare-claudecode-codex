@@ -25,6 +25,12 @@ describe('parseSensorCsv', () => {
     ).toThrow(CsvParseError);
   });
 
+  it('rejects unclosed quoted cells', () => {
+    expect(() =>
+      parseSensorCsv('timestamp,tempC,targetTempC,note\n2026-05-19T09:00:00Z,100,100,"door opened'),
+    ).toThrow(CsvParseError);
+  });
+
   it('returns [] for empty CSV', () => {
     expect(parseSensorCsv('')).toEqual([]);
   });

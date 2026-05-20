@@ -1,4 +1,3 @@
-import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { ZodError } from "zod";
 import { analyzeSensorReadings, parseSensorCsv } from "../shared/sensor.js";
@@ -7,6 +6,7 @@ import type { FiringType, TargetCone } from "../shared/domain.js";
 import { attachUser, currentUser, requireAnyRole, requireManager } from "./auth.js";
 import type { Db } from "./db/sqlite.js";
 import { HttpError, forbidden } from "./errors.js";
+import { corsMiddleware, parseAllowedOrigins, rateLimit, requestLogger, securityHeaders } from "./security.js";
 import {
   addLoadNote,
   createDraftLoadFromPlan,
@@ -28,15 +28,30 @@ import {
 } from "./repository.js";
 import { csvImportSchema, expectedVersionSchema, noteSchema, pieceInputSchema, planLoadSchema, scheduleSchema } from "./validation.js";
 
-export function createApp(db: Db): express.Express {
-  const app = express();
+export type CreateAppOptions = {
+  allowedOrigins?: string[];
+  rateLimit?: { windowMs: number; max: number };
+  isProd?: boolean;
+};
 
-  app.use(cors());
-  app.use(express.json({ limit: "1mb" }));
+export function createApp(db: Db, options: CreateAppOptions = {}): express.Express {
+  const app = express();
+  const isProd = options.isProd ?? process.env.NODE_ENV === "production";
+  const origins = options.allowedOrigins ?? parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
+  const limit = options.rateLimit ?? { windowMs: 60_000, max: 240 };
+
+  app.disable("x-powered-by");
+  app.set("trust proxy", "loopback");
+
+  app.use(securityHeaders());
+  app.use(corsMiddleware(origins));
+  app.use(rateLimit(limit));
+  app.use(express.json({ limit: "256kb", strict: true }));
+  app.use(requestLogger(isProd));
   app.use(attachUser(db));
 
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true });
+    res.json({ ok: true, time: new Date().toISOString() });
   });
 
   app.get("/api/users", (_req, res) => {
@@ -257,12 +272,12 @@ export function createApp(db: Db): express.Express {
     }
   });
 
-  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
     if (error instanceof ZodError) {
       res.status(400).json({
         code: "VALIDATION_ERROR",
         message: "Dữ liệu gửi lên chưa hợp lệ.",
-        issues: error.issues
+        issues: isProd ? undefined : error.issues
       });
       return;
     }
@@ -272,8 +287,18 @@ export function createApp(db: Db): express.Express {
       return;
     }
 
-    console.error(error);
-    res.status(500).json({ code: "INTERNAL_ERROR", message: "Lỗi máy chủ ngoài dự kiến." });
+    if (error instanceof SyntaxError && "body" in error) {
+      res.status(400).json({ code: "VALIDATION_ERROR", message: "JSON gửi lên không hợp lệ." });
+      return;
+    }
+
+    const errId = `e_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    console.error(`[${errId}] ${req.method} ${req.path}`, error);
+    res.status(500).json({
+      code: "INTERNAL_ERROR",
+      message: "Lỗi máy chủ ngoài dự kiến.",
+      errorId: errId
+    });
   });
 
   return app;

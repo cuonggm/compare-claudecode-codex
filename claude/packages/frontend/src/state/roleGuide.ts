@@ -1,6 +1,5 @@
-// Tập trung mô tả workflow + quyền cho từng role để các trang có thể đọc
-// chung một nguồn sự thật. Quyền vẫn được enforce server-side; phần này chỉ
-// dùng để hướng dẫn người dùng mới.
+// Centralized workflow and role capability copy. Server-side RBAC remains the
+// source of truth; this file only guides new users through the UI.
 
 import type { Role } from '@kilnflow/shared';
 
@@ -14,7 +13,7 @@ export interface WorkflowStep {
   description: string;
 }
 
-// Các bước cốt lõi của workflow studio, dùng cho sidebar và breadcrumb mentally.
+// Core studio workflow steps shared by navigation and onboarding surfaces.
 export const WORKFLOW_STEPS: WorkflowStep[] = [
   {
     stage: 'intake',
@@ -47,13 +46,13 @@ export interface RoleNextStep {
 }
 
 export interface RoleGuide {
-  // Tagline ngắn xuất hiện trên hero card chào mừng.
+  // Short tagline displayed on the welcome card.
   tagline: string;
-  // 3-4 bước theo thứ tự lý tưởng user nên thực hiện.
+  // Three to four steps in the ideal user workflow order.
   nextSteps: RoleNextStep[];
-  // Liệt kê quyền/khả năng theo role (hiển thị trên hint panel của trang).
+  // User-facing role capabilities displayed in page hint panels.
   can: string[];
-  // Hành động bị hạn chế — gợi ý liên hệ ai khi cần.
+  // Restricted actions and who to contact when the user needs help.
   cannot?: { items: string[]; askFor: string };
 }
 
@@ -197,7 +196,7 @@ export const ROLE_GUIDE: Record<Role, RoleGuide> = {
   observer: observerGuide,
 };
 
-// Page-level capability hint — mô tả "trên trang này, vai trò X có thể làm gì".
+// Page-level capability hints for the current role.
 export interface PageCapability {
   pageId: 'dashboard' | 'backlog' | 'intake' | 'planner' | 'loads' | 'load-detail';
   forRole: Partial<Record<Role, string[]>>;

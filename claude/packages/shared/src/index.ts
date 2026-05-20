@@ -197,8 +197,8 @@ export interface PlanRequest {
   prioritizeDueDate?: boolean;
 }
 
-// Permission helpers shared between backend & frontend so UI hides actions
-// the user cannot perform — backend still enforces independently.
+// Permission helpers shared between backend and frontend so UI hides actions
+// the user cannot perform; backend still enforces independently.
 export function canRunPlanner(role: Role): boolean {
   return role === 'technician' || role === 'manager';
 }
@@ -207,6 +207,12 @@ export function canApproveLoad(role: Role): boolean {
 }
 export function canScheduleLoad(role: Role): boolean {
   return role === 'manager';
+}
+export function canStartLoad(role: Role): boolean {
+  return role === 'technician' || role === 'manager';
+}
+export function canCompleteLoad(role: Role): boolean {
+  return role === 'technician' || role === 'manager';
 }
 export function canCancelLoad(role: Role): boolean {
   return role === 'manager';

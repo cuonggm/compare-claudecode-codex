@@ -1,5 +1,5 @@
 // Zod schemas for request validation. Keeps server-side validation distinct
-// from client-side validation — the backend never trusts the client.
+// from client-side validation; the backend never trusts the client.
 
 import { z } from 'zod';
 import {
@@ -10,8 +10,8 @@ import {
 } from '@kilnflow/shared';
 
 export const pieceInputSchema = z.object({
-  ownerId: z.string().min(1),
-  name: z.string().min(1).max(120),
+  ownerId: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(120),
   clayBody: z.enum(CLAY_BODIES as [string, ...string[]]),
   glazeFamily: z.enum(GLAZE_FAMILIES as [string, ...string[]]),
   targetCone: z.enum(TARGET_CONES as [string, ...string[]]),
@@ -31,10 +31,10 @@ export const pieceInputSchema = z.object({
 });
 
 export const planRequestSchema = z.object({
-  kilnId: z.string().min(1),
+  kilnId: z.string().trim().min(1),
   targetCone: z.enum(TARGET_CONES as [string, ...string[]]),
   firingType: z.enum(FIRING_TYPES as [string, ...string[]]),
-  candidatePieceIds: z.array(z.string()).optional(),
+  candidatePieceIds: z.array(z.string().trim().min(1)).max(500).optional(),
   prioritizeDueDate: z.boolean().optional(),
 });
 
@@ -50,7 +50,7 @@ export const scheduleSchema = z.object({
 });
 
 export const noteSchema = z.object({
-  body: z.string().min(1).max(2000),
+  body: z.string().trim().min(1).max(2000),
 });
 
 export const csvImportSchema = z.object({

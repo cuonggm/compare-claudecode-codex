@@ -52,25 +52,50 @@ export function canManageSchedule(role: Role): boolean {
   return role === "manager";
 }
 
-export async function apiRequest<T>(path: string, userId: number, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "x-user-id": String(userId),
-      ...init.headers
-    }
-  });
+const DEFAULT_TIMEOUT_MS = 15_000;
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const error = new Error(body.message ?? `Request failed with ${response.status}`) as ApiError;
-    error.status = response.status;
-    error.code = body.code;
+export async function apiRequest<T>(path: string, userId: number, init: RequestInit = {}): Promise<T> {
+  if (!Number.isInteger(userId) || userId <= 0) {
+    const error = new Error("Thiếu hoặc sai mã người dùng.") as ApiError;
+    error.code = "INVALID_USER";
     throw error;
   }
 
-  return response.json() as Promise<T>;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: init.signal ?? controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-user-id": String(userId),
+        ...init.headers
+      }
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({} as Record<string, unknown>));
+      const message = typeof body.message === "string" ? body.message : `Request failed with ${response.status}`;
+      const error = new Error(message) as ApiError;
+      error.status = response.status;
+      error.code = typeof body.code === "string" ? body.code : undefined;
+      throw error;
+    }
+
+    return (await response.json()) as T;
+  } catch (rawError) {
+    if (rawError instanceof DOMException && rawError.name === "AbortError") {
+      const error = new Error("Hết thời gian chờ phản hồi từ máy chủ.") as ApiError;
+      error.code = "TIMEOUT";
+      throw error;
+    }
+    throw rawError;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export const Api = {

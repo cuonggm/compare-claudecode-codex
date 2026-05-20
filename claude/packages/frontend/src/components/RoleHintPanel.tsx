@@ -3,8 +3,8 @@ import { PAGE_CAPABILITY } from '../state/roleGuide';
 import { roleLabel } from '../i18n';
 import { Icon } from './Icon';
 
-// Thanh gợi ý ngắn nằm dưới PageHeader: "Trên trang này, vai trò X có thể…".
-// Mục tiêu là user mới hiểu ngay phạm vi thao tác mà không cần nhấn thử từng nút.
+// Compact hint under PageHeader that explains what the current role can do on
+// the page without making users probe disabled controls.
 export function RoleHintPanel({
   pageId,
   role,

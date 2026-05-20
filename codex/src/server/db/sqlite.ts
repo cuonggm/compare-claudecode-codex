@@ -21,6 +21,11 @@ export function openDatabase(databasePath = getDefaultDatabasePath()): Db {
 
   const db = new DatabaseSync(databasePath);
   db.exec("PRAGMA foreign_keys = ON;");
+  db.exec("PRAGMA busy_timeout = 5000;");
+  if (databasePath !== ":memory:") {
+    db.exec("PRAGMA journal_mode = WAL;");
+    db.exec("PRAGMA synchronous = NORMAL;");
+  }
   return db;
 }
 

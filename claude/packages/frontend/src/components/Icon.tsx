@@ -1,5 +1,5 @@
-// Bộ icon SVG inline gọn nhẹ cho KilnFlow. Tránh dependency để giữ bundle nhỏ.
-// Mỗi icon nhận size mặc định 18px và kế thừa color qua currentColor.
+// Lightweight inline SVG icons for KilnFlow. Avoids an icon dependency and
+// keeps the bundle small. Icons inherit color through currentColor.
 
 import type { SVGProps } from 'react';
 
@@ -52,7 +52,7 @@ export const Icon = {
     </svg>
   ),
   Kiln: (p: IconProps) => (
-    // Mặt cắt lò nung: thân lò vuông, mái vòm, cửa quan sát ở giữa
+    // Kiln cross-section: square body, arch roof, and center peephole.
     <svg {...base(p)}>
       <path d="M5 21V9a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v12" />
       <path d="M3 21h18" />
@@ -61,7 +61,7 @@ export const Icon = {
     </svg>
   ),
   Pot: (p: IconProps) => (
-    // Chiếc bình gốm với cổ thắt và miệng loe
+    // Ceramic vase with a narrowed neck and flared lip.
     <svg {...base(p)}>
       <path d="M8 4h8" />
       <path d="M9 4v3a3 3 0 0 1-1 2.2A6 6 0 0 0 6 14v3a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-3a6 6 0 0 0-2-4.8A3 3 0 0 1 15 7V4" />

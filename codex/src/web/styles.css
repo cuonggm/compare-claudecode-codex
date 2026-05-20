@@ -1431,6 +1431,131 @@ td small {
   border: 0;
 }
 
+.skip-link {
+  position: absolute;
+  top: -42px;
+  left: 12px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--fire);
+  color: #24120b;
+  font-weight: 820;
+  text-decoration: none;
+  transition: top 160ms ease;
+}
+
+.skip-link:focus-visible {
+  top: 12px;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notice-body {
+  flex: 1 1 auto;
+  line-height: 1.4;
+}
+
+.notice-dismiss {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 7px;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+
+.notice-dismiss:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.busy-indicator {
+  margin-left: 8px;
+  color: var(--fire);
+  font-size: 0.86em;
+  font-weight: 720;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 9, 9, 0.74);
+  backdrop-filter: blur(6px);
+}
+
+.dialog {
+  width: min(440px, 100%);
+  padding: 22px;
+  border: 1px solid rgba(255, 191, 105, 0.24);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 191, 105, 0.04), transparent 38%),
+    var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+
+.dialog h2 {
+  margin: 0 0 10px;
+  font-size: 1.18rem;
+}
+
+.dialog p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialog-actions button {
+  min-height: 40px;
+  padding: 0 16px;
+  font-weight: 820;
+}
+
+.primary-button.danger,
+.danger-button {
+  background: linear-gradient(180deg, #f08672, #d35946);
+  color: #210b06;
+  border-color: rgba(226, 101, 85, 0.6);
+  box-shadow: 0 12px 24px rgba(211, 89, 70, 0.22);
+}
+
+.primary-button.danger:hover:not(:disabled),
+.danger-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ff9c89, #e26b58);
+}
+
+.busy-overlay {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+main[aria-busy="true"] button:not(.notice-dismiss):not(.skip-link),
+main[aria-busy="true"] input,
+main[aria-busy="true"] select,
+main[aria-busy="true"] textarea {
+  filter: saturate(0.92);
+}
+
 @media (max-width: 1180px) {
   .app-shell,
   .dashboard-layout,

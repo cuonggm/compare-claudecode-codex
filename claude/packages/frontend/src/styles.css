@@ -1,15 +1,15 @@
-/* KilnFlow Ops — design system tinh tế, accessible, lấy cảm hứng từ lò nung gốm. */
+/* KilnFlow Ops design system: accessible, warm, and kiln-inspired. */
 
 /* ---------- Design tokens ---------- */
 :root {
-  /* Warm ceramic palette — đất sét nung đậm, ấm áp như studio gốm thủ công */
+  /* Warm ceramic palette for a craft studio feel. */
   --bg: #eadcc4;
   --bg-grain:
-    /* Hơi ấm hắt lên từ lò nung góc dưới-phải */
+    /* Kiln warmth rising from the lower-right corner. */
     radial-gradient(ellipse 900px 520px at 95% 110%, rgba(176, 70, 22, 0.18), transparent 55%),
-    /* Vệt nắng sáng hắt vào từ góc trên-trái */
+    /* Soft daylight entering from the upper-left corner. */
     radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(230, 165, 95, 0.28), transparent 60%),
-    /* Texture chấm giấy gốm thủ công */
+    /* Handmade ceramic-paper grain. */
     radial-gradient(circle 1px at 20% 30%, rgba(80, 45, 18, 0.05) 1px, transparent 2px),
     radial-gradient(circle 1px at 70% 65%, rgba(80, 45, 18, 0.04) 1px, transparent 2px),
     radial-gradient(circle 1.5px at 45% 85%, rgba(80, 45, 18, 0.05) 1px, transparent 2px),
@@ -31,13 +31,13 @@
   --text-subtle: #a08c68;
   --text-on-accent: #fff8ec;
 
-  /* Brand — cam đất nung đậm hơn, gợi than hồng */
+  /* Brand: darker fired-clay orange with ember depth. */
   --accent: #a64a18;
   --accent-strong: #7a2f08;
   --accent-soft: #efd2b0;
   --accent-tint: #f9e7cf;
 
-  /* Lửa — ánh than hồng cho hiệu ứng firing */
+  /* Fire accents for active firing states. */
   --ember: #e0531a;
   --ember-bright: #ff8a3d;
   --ember-glow: rgba(224, 83, 26, 0.55);
@@ -94,7 +94,7 @@
   --dur-fast: 120ms;
   --dur: 180ms;
 
-  /* Font stacks — sans cho body, serif cổ điển cho heading gợi nhớ nghệ nhân thủ công */
+  /* Font stacks: workhorse sans for body, classic serif for craft headings. */
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
   --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino,
@@ -107,7 +107,7 @@
   text-rendering: optimizeLegibility;
 }
 
-/* Heading mặc định dùng serif để gợi nét bản thảo nghệ nhân */
+/* Default headings use serif to create a handmade studio tone. */
 h1, h2, h3, h4 {
   font-family: var(--font-serif);
   font-weight: 600;
@@ -1589,6 +1589,7 @@ figure {
   }
   .sidebar nav a {
     padding: 0.4rem 0.6rem;
+    white-space: nowrap;
   }
   .sidebar nav a.active::before,
   .sidebar nav a[aria-current='page']::before {
@@ -1631,6 +1632,31 @@ figure {
 }
 
 @media (max-width: 600px) {
+  .sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .sidebar .brand {
+    min-width: 0;
+  }
+  .sidebar nav {
+    grid-column: 1 / -1;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+  }
+  .sidebar nav a {
+    flex: 0 0 auto;
+  }
+  .sidebar .sidebar-spacer {
+    display: none;
+  }
+  .sidebar .user-card {
+    min-width: 0;
+    max-width: 170px;
+  }
   .page-header h1 {
     font-size: var(--fs-2xl);
   }
@@ -1646,9 +1672,9 @@ figure {
   }
 }
 
-/* ---------- Theme lò nung: minh hoạ & hiệu ứng lửa ---------- */
+/* ---------- Kiln Theme: Illustration And Fire Effects ---------- */
 
-/* SVG Lò nung — dùng trong dashboard & login */
+/* Kiln SVG used on Dashboard and Login. */
 .kiln-illustration {
   width: 100%;
   max-width: 320px;
@@ -1656,7 +1682,7 @@ figure {
   display: block;
 }
 
-/* Hồn lửa động cho icon Flame và ngọn lửa trong illustration */
+/* Animated flame treatment for icons and the illustration. */
 .flame-flicker {
   transform-origin: center bottom;
   animation: flame-dance 1.8s ease-in-out infinite;
@@ -1675,7 +1701,7 @@ figure {
   75% { transform: scale(1.02, 0.96) translateY(0); }
 }
 
-/* Than hồng phát quang dưới đáy lò */
+/* Glowing embers under the kiln. */
 .ember-glow {
   animation: ember-breath 3.2s ease-in-out infinite;
   filter: drop-shadow(0 0 8px var(--ember-glow));
@@ -1689,7 +1715,7 @@ figure {
   .flame-flicker, .ember-glow { animation: none; }
 }
 
-/* Card chỉ số khi "đang nung" — viền ánh than */
+/* KPI card treatment for active firing state. */
 .kpi.tone-firing {
   background:
     radial-gradient(ellipse 240px 120px at 80% -10%, rgba(255, 138, 61, 0.25), transparent 60%),
@@ -1712,7 +1738,7 @@ figure {
   color: transparent;
 }
 
-/* Eyebrow text khắc dấu — gợi nét stamp của nghệ nhân */
+/* Eyebrow stamp mark inspired by studio labels. */
 .section-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -1726,13 +1752,13 @@ figure {
   border-radius: 2px;
 }
 
-/* Heading có dấu nhấn nghệ thuật ở dưới */
+/* Page heading accent hook. */
 .page-header h1 {
   font-family: var(--font-serif);
   position: relative;
 }
 
-/* Card hero "Trạng thái lò" — hiển thị bên trong dashboard */
+/* Kiln status hero card shown inside the dashboard. */
 .kiln-status-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1822,13 +1848,13 @@ figure {
   z-index: 1;
 }
 
-/* Hero login — kiln art lớn */
+/* Large kiln artwork on the login hero. */
 .login-hero .kiln-art-wrap {
   margin-top: var(--s-4);
   align-self: flex-start;
 }
 
-/* Brand mark trang trí dấu lửa */
+/* Brand mark ember decoration. */
 .brand-mark {
   position: relative;
   font-family: var(--font-serif);
@@ -1843,13 +1869,13 @@ figure {
   opacity: 0.7;
 }
 
-/* Sidebar brand-name dùng serif */
+/* Sidebar brand name uses the display serif. */
 .sidebar .brand .brand-name {
   font-family: var(--font-serif);
   font-size: 1.1rem;
 }
 
-/* Chip "đang nung" có ember glow trong toolbar */
+/* Active firing chip with ember glow. */
 .chip.firing {
   background: linear-gradient(180deg, rgba(255, 138, 61, 0.18), rgba(166, 74, 24, 0.12));
   color: var(--accent-strong);
@@ -1857,14 +1883,14 @@ figure {
   box-shadow: 0 0 10px -4px var(--ember-glow);
 }
 
-/* Trang trí ngọn lửa cho icon Flame trong sidebar khi active route loads */
+/* Flame accent on the active Loads route. */
 .sidebar nav a[href$="/loads"].active .nav-icon,
 .sidebar nav a[href$="/loads"][aria-current='page'] .nav-icon {
   color: #ffb56b;
   filter: drop-shadow(0 0 6px var(--ember-glow));
 }
 
-/* Layout kệ thêm hơi nóng ở đáy */
+/* Shelf layout heat glow at the bottom edge. */
 .shelf .layout::after {
   content: '';
   position: absolute;
@@ -1876,13 +1902,13 @@ figure {
   border-bottom-right-radius: inherit;
 }
 
-/* Khi load đang firing, viền card LoadDetail nhấn ánh than */
+/* Load detail card border when the load is firing. */
 .card.is-firing {
   border-color: rgba(224, 83, 26, 0.45);
   box-shadow: var(--shadow-md), 0 0 0 1px rgba(224, 83, 26, 0.18), 0 0 24px -8px var(--ember-glow);
 }
 
-/* ---------- Workflow guide (Dashboard "Bạn nên làm gì tiếp theo") ---------- */
+/* ---------- Workflow Guide (Dashboard Next Steps) ---------- */
 .workflow-guide {
   background:
     radial-gradient(ellipse 600px 300px at 100% 0%, rgba(255, 220, 170, 0.5), transparent 60%),
@@ -2062,7 +2088,7 @@ figure {
   line-height: 1.4;
 }
 
-/* ---------- Role hint panel (mỗi page) ---------- */
+/* ---------- Role Hint Panel ---------- */
 .role-hint {
   background: linear-gradient(180deg, var(--accent-tint) 0%, var(--surface) 100%);
   border: 1px solid var(--accent-soft);
@@ -2197,7 +2223,7 @@ figure {
   }
 }
 
-/* Divider trang trí ghi dấu chương */
+/* Decorative chapter divider. */
 .ornament-divider {
   display: flex;
   align-items: center;

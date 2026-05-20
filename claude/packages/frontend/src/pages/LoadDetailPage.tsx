@@ -4,9 +4,11 @@ import {
   canAddTechnicalNote,
   canApproveLoad,
   canCancelLoad,
+  canCompleteLoad,
   canImportSensorCsv,
   canRunPlanner,
   canScheduleLoad,
+  canStartLoad,
   type Alert,
   type Kiln,
   type KilnLoad,
@@ -147,6 +149,8 @@ export function LoadDetailPage() {
     canRunPlanner(role) ||
     canApproveLoad(role) ||
     canScheduleLoad(role) ||
+    canStartLoad(role) ||
+    canCompleteLoad(role) ||
     canCancelLoad(role);
   const isFiring = load.status === 'firing';
 
@@ -293,6 +297,24 @@ export function LoadDetailPage() {
                 </button>
               </span>
             )}
+          {canStartLoad(role) &&
+            (load.status === 'approved' || load.status === 'scheduled') && (
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => performAction('Bắt đầu nung', () => api.startLoad(load.id, load.version))}
+              >
+                <Icon.Flame size={16} /> Bắt đầu nung
+              </button>
+            )}
+          {canCompleteLoad(role) && load.status === 'firing' && (
+            <button
+              disabled={busy}
+              onClick={() => performAction('Hoàn tất', () => api.completeLoad(load.id, load.version))}
+            >
+              <Icon.Check size={16} /> Hoàn tất
+            </button>
+          )}
           {canCancelLoad(role) &&
             load.status !== 'cancelled' &&
             load.status !== 'completed' && (

@@ -30,10 +30,10 @@ project local-only and time-bounded.
 - Per-shelf weight is not modelled — only total kiln weight. A real studio
   might want a per-shelf weight cap too.
 - The score is heuristic and not auto-tuned. Glaze risk penalties are coarse.
-- Auto-planner does not consider previously fired/scheduled pieces — it can
-  re-select pieces that are already in another draft load. The "in-load" piece
-  status is implemented in the data model but the planner does not yet
-  consume it. *Workaround:* set status to `in-load` after approval.
+- Pieces are reserved as `in-load` when a draft is approved or scheduled, so
+  later planner runs exclude them. Draft loads still do not reserve pieces until
+  they move into that operational workflow; two draft loads can temporarily show
+  overlapping candidates.
 
 ## Sensor / firing monitor
 
@@ -41,11 +41,9 @@ project local-only and time-bounded.
 - The analyzer compares each new reading against the immediately previous one
   for ramp rate. A more sophisticated implementation would window over the
   last N minutes.
-- `UNEXPECTED_COOLDOWN` only fires when load status is `firing`. The status is
-  not auto-promoted from `scheduled` to `firing` — a manager must do that.
-  Today there is no UI for that transition; the load stays in `scheduled` and
-  cool-down detection lies dormant. Set status manually in DB or extend the
-  schedule action to take `--start` (not implemented).
+- `UNEXPECTED_COOLDOWN` only fires when load status is `firing`. Operators now
+  start and complete a firing from the load detail page; the system still does
+  not auto-start a firing from the scheduled timestamp.
 
 ## Frontend
 
@@ -61,9 +59,11 @@ project local-only and time-bounded.
 
 ## Security
 
-- Server only validates inputs at the API boundary (Zod). It does not
-  rate-limit, audit failed login attempts, or run secure headers (CSP, HSTS).
-  Out of scope for a local tool.
+- Server validates inputs at the API boundary (Zod), returns JSON for malformed
+  JSON/unknown API routes, sends basic hardening headers, and rate-limits write
+  requests in memory. It still does not provide real sessions, CSP/HSTS for a
+  hosted frontend, persistent audit of failed auth attempts, or distributed
+  rate-limiting.
 - CORS is wide-open to `http://localhost:5173` in dev. For production, set
   `CORS_ORIGIN` to the deployed origin.
 - React renders text by default, but if a future feature renders user-supplied

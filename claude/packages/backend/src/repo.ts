@@ -140,10 +140,21 @@ export class Repo {
   deletePiece(id: string) {
     this.db.prepare('DELETE FROM pieces WHERE id = ?').run(id);
   }
-  updatePieceStatus(id: string, status: string, updatedAt: string) {
+  updatePieceStatus(id: string, status: Piece['status'], updatedAt: string) {
     this.db
       .prepare('UPDATE pieces SET status = ?, updatedAt = ? WHERE id = ?')
       .run(status, updatedAt, id);
+  }
+  updatePieceStatuses(ids: string[], status: Piece['status'], updatedAt: string) {
+    const uniqueIds = Array.from(new Set(ids));
+    if (uniqueIds.length === 0) return;
+    const stmt = this.db.prepare('UPDATE pieces SET status = ?, updatedAt = ? WHERE id = ?');
+    const txn = this.db.transaction((pieceIds: string[]) => {
+      for (const id of pieceIds) {
+        stmt.run(status, updatedAt, id);
+      }
+    });
+    txn(uniqueIds);
   }
 
   // Loads
@@ -180,7 +191,8 @@ export class Repo {
       );
   }
   /**
-   * Optimistic update. Returns the updated load or null if version mismatch.
+   * Optimistic update. Returns the updated load or the current server state on
+   * version mismatch.
    */
   updateLoadWithVersionCheck(
     id: string,
@@ -198,7 +210,7 @@ export class Repo {
       return { conflict: true, current };
     }
     const newVersion = current.version + 1;
-    this.db
+    const result = this.db
       .prepare(
         `UPDATE kiln_loads SET
            status = COALESCE(?, status),
@@ -218,6 +230,9 @@ export class Repo {
         id,
         expectedVersion,
       );
+    if (result.changes === 0) {
+      return { conflict: true, current: this.getLoad(id) };
+    }
     return this.getLoad(id)!;
   }
 

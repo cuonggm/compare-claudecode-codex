@@ -36,9 +36,9 @@ export function parseSensorCsv(text: string): ParsedReading[] {
     .filter((l) => l.length > 0);
   if (rows.length === 0) return [];
 
-  const headerCells = splitCsvLine(rows[0]).map((c) => c.trim());
+  const headerCells = splitCsvLine(rows[0], 1).map((c) => c.trim());
   const headerMap: Record<string, number> = {};
-  let hasHeader = REQUIRED_HEADERS.every((h) =>
+  const hasHeader = REQUIRED_HEADERS.every((h) =>
     headerCells.some((c) => c.toLowerCase() === h.toLowerCase()),
   );
   if (hasHeader) {
@@ -65,7 +65,7 @@ export function parseSensorCsv(text: string): ParsedReading[] {
   const out: ParsedReading[] = [];
   for (let i = 0; i < dataRows.length; i++) {
     const lineNum = i + (hasHeader ? 2 : 1);
-    const cells = splitCsvLine(dataRows[i]);
+    const cells = splitCsvLine(dataRows[i], lineNum);
     const ts = (cells[tsIdx] ?? '').trim();
     const temp = Number((cells[tempIdx] ?? '').trim());
     const target = Number((cells[tgtIdx] ?? '').trim());
@@ -90,7 +90,7 @@ export function parseSensorCsv(text: string): ParsedReading[] {
 
 // Minimal CSV cell splitter that respects double-quoted cells but does not
 // implement full RFC 4180. The kiln CSVs are simple and authored by hand.
-function splitCsvLine(line: string): string[] {
+function splitCsvLine(line: string, lineNum: number): string[] {
   const out: string[] = [];
   let cur = '';
   let inQuotes = false;
@@ -117,6 +117,9 @@ function splitCsvLine(line: string): string[] {
         cur += ch;
       }
     }
+  }
+  if (inQuotes) {
+    throw new CsvParseError(lineNum, 'Dấu nháy kép chưa được đóng.');
   }
   out.push(cur);
   return out;
